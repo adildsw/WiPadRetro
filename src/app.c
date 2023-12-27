@@ -7,7 +7,7 @@
 #include <SDL_image.h>
 #include <pthread.h>
 
-#include <gamepad_util.h>
+#include <config_util.h>
 #include <ip_util.h>
 #include <tcp_server.h>
 
@@ -29,7 +29,7 @@ int ip_count;
 char **ip_addresses;
 int ip_index = 0;
 
-char client_ip_address[15] = "";
+char client_ip_address[16] = "";
 SDL_bool is_connected = SDL_FALSE;
 
 SDL_bool is_up = SDL_FALSE;
@@ -53,6 +53,8 @@ void render();
 void tcp_callback(const char* data);
 void cleanup();
 
+
+// ---------------- Initialization ----------------
 void init()
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1)
@@ -96,11 +98,13 @@ void init()
     cycle_network();
 
     state = init_gamepad_state();
-    load_gamepad_config("./key_config.ini", &config);
+    load_gamepad_config(&config);
 
     start_tcp_server(tcp_callback);
 }
 
+
+// ---------------- Render Functions ----------------
 void render_text(SDL_Surface *screen, const char *text, int x, int y, TTF_Font *font, SDL_Color color)
 {
     SDL_Surface *textSurface = TTF_RenderText_Solid(font, text, color);
@@ -138,7 +142,10 @@ void render_title() {
     topBarRect.w = 125;
     topBarRect.h = 20;
 
-    SDL_FillRect(buffer, &topBarRect, SDL_MapRGB(buffer->format, 255, 102, 102));
+    if (is_connected)
+        SDL_FillRect(buffer, &topBarRect, SDL_MapRGB(buffer->format, 34, 139, 34));
+    else 
+        SDL_FillRect(buffer, &topBarRect, SDL_MapRGB(buffer->format, 255, 102, 102));
     render_text(buffer, "WiPadRetro v0.1", 5, 3, font_bold, white);
 }
 
@@ -152,22 +159,15 @@ void render_topbar(const char* text) {
     SDL_FillRect(buffer, &con_bar_rect, SDL_MapRGB(buffer->format, 230, 230, 230));
     SDL_Color c = {0, 0, 0};
 
-    SDL_Rect con_ind_rect;
-    con_ind_rect.x = WINDOW_WIDTH - 15;
-    con_ind_rect.y = 5;
-    con_ind_rect.w = 10;
-    con_ind_rect.h = 10;
     if (is_connected)
     {
         render_text(buffer, "Connected: ", 130, 3, font, c);
         render_text(buffer, client_ip_address, 200, 3, font, c);
-        SDL_FillRect(buffer, &con_ind_rect, SDL_MapRGB(buffer->format, 34, 139, 34));
     }
     else
     {
         render_text(buffer, "Device: ", 130, 3, font, c);
         render_text(buffer, ip_addresses[ip_index], 175, 3, font, c);
-        SDL_FillRect(buffer, &con_ind_rect, SDL_MapRGB(buffer->format, 255, 102, 102));
     }
 }
 
@@ -194,6 +194,31 @@ void render_bottombar() {
     render_text(buffer, control_help, 5, WINDOW_HEIGHT - 17, font, white);
 }
 
+void render_input_visualization() {
+    render_image(buffer, gamepad_body_vis_img_path, 0, 0);
+    if (!is_connected) return;
+
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        if (state.state[i]) {
+            render_image(buffer, vis_img_path.config[i], 0, 0);
+        }
+    }
+}
+
+void render() {
+    SDL_FillRect(buffer, NULL, SDL_MapRGB(buffer->format, 0, 0, 0));
+    render_title();
+    render_topbar("Network: 127.0.0.1");
+    render_bottombar();
+    render_input_visualization();
+
+    SDL_BlitSurface(buffer, NULL, screen, NULL);
+    SDL_Flip(screen);
+    redraw = SDL_FALSE;
+}
+
+
+// ---------------- Input Handling ----------------
 void handle_input(SDL_Event* event) {
     if (event->type == SDL_KEYDOWN || event->type == SDL_KEYUP) {
         int stateChange = (event->type == SDL_KEYDOWN) ? 1 : 0;
@@ -243,17 +268,6 @@ void handle_input(SDL_Event* event) {
     }
 }
 
-void render_input_visualization() {
-    render_image(buffer, gamepad_body_vis_img_path, 0, 0);
-    if (!is_connected) return;
-
-    for (int i = 0; i < NUM_BUTTONS; i++) {
-        if (state.state[i]) {
-            render_image(buffer, vis_img_path.config[i], 0, 0);
-        }
-    }
-}
-
 void cycle_network() {
     if (ip_count <= 1) return;
     if (ip_count == 2) {
@@ -271,23 +285,11 @@ void cycle_network() {
     ip_index = (ip_index + 1) % ip_count;
 }
 
-void render() {
-    SDL_FillRect(buffer, NULL, SDL_MapRGB(buffer->format, 0, 0, 0));
-    render_title();
-    render_topbar("Network: 192.168.000.100");
-    render_bottombar();
-    render_input_visualization();
-
-    SDL_BlitSurface(buffer, NULL, screen, NULL);
-    SDL_Flip(screen);
-    redraw = SDL_FALSE;
-}
-
 void tcp_callback(const char* data) {
     printf("Data received: %s\n", data);
-    send_to_client("Hello from server");
 
     if (strncmp(data, "CLIENT:", 7) == 0) {
+        send_to_client("WIPADRETRO_CONNECTED");
         strcpy(client_ip_address, data + 7);
         is_connected = SDL_TRUE;
         redraw = SDL_TRUE;
@@ -300,12 +302,15 @@ void tcp_callback(const char* data) {
     }
 }
 
+
+// ---------------- Main and Cleanup ----------------
 int main(int argc, char *argv[])
 {
+    // Initializing app
     init();
 
+    // Main SDL loop
     SDL_Event event;
-
     while (running)
     {
         while (SDL_PollEvent(&event)) {
@@ -313,21 +318,27 @@ int main(int argc, char *argv[])
                 running = SDL_FALSE;
                 break;
             }
+
+            // Handling input
             handle_input(&event);
         }
 
+        // Rendering
         if (redraw) render();
 
+        // Delaying to 60 FPS
         SDL_Delay(1000 / 60);
     }
-
     cleanup();
-
     return 0;
 }
 
 void cleanup()
 {
+    // Stopping TCP server
+    stop_tcp_server();
+
+    // Cleaning up IP string allocations
     if (ip_addresses)
     {
         for (int i = 0; i < ip_count; i++)
@@ -336,9 +347,8 @@ void cleanup()
         }
         free(ip_addresses);
     }
-    if (screen) SDL_FreeSurface(screen);
-    if (buffer) SDL_FreeSurface(buffer);
 
+    // Cleaning up gamepad configuration allocations
     for (int i = 0; i < NUM_BUTTONS; i++) {
         if (config.is_allocated[i]) {
             free(config.config[i]);
@@ -346,7 +356,11 @@ void cleanup()
         }
     }
 
-    stop_tcp_server();
+    // Cleaning up screen buffers
+    if (screen) SDL_FreeSurface(screen);
+    if (buffer) SDL_FreeSurface(buffer);
+
+    // Cleaning up SDL
     TTF_CloseFont(font);
     TTF_Quit();
     SDL_Quit();

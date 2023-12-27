@@ -1,5 +1,5 @@
-#ifndef GAMEPAD_UTIL_H
-#define GAMEPAD_UTIL_H
+#ifndef CONFIG_UTIL_H
+#define CONFIG_UTIL_H
 
 #define NUM_BUTTONS 15
 #define MAX_KEY_NAME_LENGTH 30
@@ -46,6 +46,7 @@ extern const gamepad_vis_img_path vis_img_path;
 extern const gamepad_button_enum_map button_mapping[NUM_BUTTONS];
 
 gamepad_state init_gamepad_state();
-void load_gamepad_config(const char* filepath, gamepad_config* config);
+void load_gamepad_config(gamepad_config* config);
+void create_gamepad_config_file(const char* filename);
 
 #endif

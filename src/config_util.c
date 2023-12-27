@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
-#include <gamepad_util.h>
+#include <config_util.h>
 
 const char* gamepad_body_vis_img_path = "./assets/screen/main.png";
 
@@ -48,9 +49,8 @@ gamepad_state init_gamepad_state(void) {
     return state;
 }
 
-void load_gamepad_config(const char* filepath, gamepad_config* config) {
+void load_gamepad_config(gamepad_config* config) {
     memset(config->is_allocated, 0, sizeof(config->is_allocated));
-
     for (int i = 0; i < NUM_BUTTONS; i++) {
         if (config->config[i] != NULL) {
             free(config->config[i]);
@@ -58,10 +58,13 @@ void load_gamepad_config(const char* filepath, gamepad_config* config) {
         }
     }
 
-    FILE *file = fopen(filepath, "r");
+    const char* filename = "config.ini";
+
+    create_gamepad_config_file(filename);
+    FILE *file = fopen(filename, "r");
     if (!file) {
-        fprintf(stderr, "Unable to open the config file: %s\n", filepath);
-        return;
+        fprintf(stderr, "Unable to open the config file: %s\n", filename);
+        exit(EXIT_FAILURE);
     }
 
     char line[256];
@@ -87,4 +90,30 @@ void load_gamepad_config(const char* filepath, gamepad_config* config) {
         }
     }
     fclose(file);
+}
+
+void create_gamepad_config_file(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file != NULL) {
+        fclose(file);
+    } else {
+        if (errno == ENOENT) {
+            file = fopen(filename, "w");
+            if (file == NULL) {
+                perror("Error creating file");
+                exit(EXIT_FAILURE);
+            }
+            
+            fprintf(file, "up=up\ndown=down\nleft=left\nright=right\n");
+            fprintf(file, "a=space\nb=left ctrl\nx=left shift\ny=left alt\n");
+            fprintf(file, "l1=e\nl2=tab\nr1=t\nr2=backspace\n");
+            fprintf(file, "start=return\nselect=right ctrl\nmenu=escape\n");
+
+            fclose(file);
+            printf("File '%s' created with default settings.\n", filename);
+        } else {
+            perror("Error opening file");
+            exit(EXIT_FAILURE);
+        }
+    }
 }

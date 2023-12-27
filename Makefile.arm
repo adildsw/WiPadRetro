@@ -1,8 +1,7 @@
 # Compiler settings
-CC = gcc
-CFLAGS = -I./include/ $(shell sdl-config --cflags)
-LIBS = $(shell sdl-config --libs) -lSDL_image -lSDL_ttf -lpthread
-EXTRA = -mmacosx-version-min=14.0
+CC = ${CROSS_COMPILE}gcc
+CFLAGS = -I./include/ -I${PREFIX}/include/SDL/
+LIBS = -L${PREFIX}/lib/ -lSDL -lSDL_image -lSDL_ttf -lpthread
 
 # Source and object files
 SRC = $(wildcard src/*.c)

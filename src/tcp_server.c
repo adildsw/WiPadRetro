@@ -1,47 +1,21 @@
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>      // for close function
-#include <netinet/in.h>  // for AF_INET, SOCK_STREAM, etc.
-#include <arpa/inet.h>   // for inet_ntoa
-#include <pthread.h>     // for POSIX Threads
+#include <unistd.h>      
+#include <netinet/in.h> 
+#include <arpa/inet.h>   
+#include <pthread.h>
 
-#include <tcp_server.h>  // Your TCP server interface
+#include <tcp_server.h>
 
-#define PORT 1803
-#define BUFFER_SIZE 1024
+int global_client_fd = -1;
 
-// Global variables
-volatile int keep_running = 1;
-int global_client_fd = -1;  // Initially no client is connected
-
-// Forward declaration of functions
-static void *tcp_server_thread(void *arg);
-
-// Function to send data to the client
-void send_to_client(const char* data) {
-    if (global_client_fd != -1 && data) {
-        send(global_client_fd, data, strlen(data), 0);  // Send the data
-    } else {
-        // Handle error or no connection case
-        fprintf(stderr, "No client connected or invalid data\n");
-    }
-}
-
-// Function to stop the server
-void stop_tcp_server() {
-    keep_running = 0;
-    if (global_client_fd != -1) {
-        close(global_client_fd);  // Close the client socket
-        global_client_fd = -1;    // Reset the global client file descriptor
-    }
-}
+pthread_t thread_id;
 
 // TCP server thread function
 static void *tcp_server_thread(void *arg) {
-    DataReceivedCallback data_handler = (DataReceivedCallback)arg;
-    int server_fd;
+    data_received_callback data_handler = (data_received_callback)arg;
+    int server_fd = -1;
     struct sockaddr_in server_addr, client_addr;
-    int opt = 1;
     char buffer[BUFFER_SIZE];
 
     // Create socket
@@ -52,6 +26,7 @@ static void *tcp_server_thread(void *arg) {
     }
 
     // Set the SO_REUSEADDR socket option
+    int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("setsockopt(SO_REUSEADDR) failed");
         close(server_fd);
@@ -89,10 +64,10 @@ static void *tcp_server_thread(void *arg) {
     printf("Connection accepted from %s\n", inet_ntoa(client_addr.sin_addr));
 
     // Receive messages from client
-    while (keep_running) {
+    while (1) {
         ssize_t bytes_received = recv(global_client_fd, buffer, BUFFER_SIZE, 0);
         if (bytes_received > 0) {
-            buffer[bytes_received] = '\0';  // Null-terminate the received data
+            buffer[bytes_received] = '\0';
             if (strcmp(buffer, "WIPADRETRO_CONNECT") == 0) {
                 char msg[30] = "CLIENT:";
                 strcat(msg, inet_ntoa(client_addr.sin_addr));
@@ -100,31 +75,29 @@ static void *tcp_server_thread(void *arg) {
                 continue;
             } 
             else {
-                data_handler("DISCONNECTED");
+                printf("Invalid client");
                 break;
             }
-            data_handler(buffer);          // Handle the received data
         } else if (bytes_received == 0) {
-            puts("Client disconnected");
-            data_handler("DISCONNECTED");
+            printf("Client disconnected");
             break;
         } else {
-            perror("recv failed");
-            data_handler("DISCONNECTED");
+            printf("recv failed");
             break;
         }
     }
 
     // Cleanup
-    close(global_client_fd);  // Close the client socket
-    close(server_fd);         // Close the server socket
-    global_client_fd = -1;    // Reset the global client file descriptor
+    close(global_client_fd);
+    close(server_fd);
+    server_fd = -1;
+    global_client_fd = -1;
+    data_handler("DISCONNECTED");
     return NULL;
 }
 
 // Function to start the TCP server
-void start_tcp_server(DataReceivedCallback callback) {
-    pthread_t thread_id;
+void start_tcp_server(data_received_callback callback) {
     if (pthread_create(&thread_id, NULL, tcp_server_thread, (void *)callback)) {
         fprintf(stderr, "Could not create TCP server thread\n");
     } else {
@@ -132,10 +105,30 @@ void start_tcp_server(DataReceivedCallback callback) {
     }
 }
 
-void force_disconnect_client() {
+// Function to send data to the client
+void send_to_client(const char* data) {
+    if (global_client_fd != -1 && data) {
+        send(global_client_fd, data, strlen(data), 0);
+    } else {
+        fprintf(stderr, "No client connected or invalid data\n");
+    }
+}
+
+// Function to stop the server
+void stop_tcp_server() {
     if (global_client_fd != -1) {
         close(global_client_fd);
+        global_client_fd = -1;
+        pthread_detach(thread_id);
+    }
+}
+
+// Function to force disconnect the client
+void force_disconnect_client() {
+    if (global_client_fd != -1) {
+        send_to_client("WIPADRETRO_DISCONNECT");
+        close(global_client_fd);
+        global_client_fd = -1;
         printf("Client forcefully disconnected\n");
-        global_client_fd = -1; // Reset the global client file descriptor
     }
 }
