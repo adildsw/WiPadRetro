@@ -1,7 +1,3 @@
-// Uses SDL1.2
-// MAC: gcc app.c -o app `sdl-config --cflags --libs` -lSDL_ttf  -mmacosx-version-min=14.0
-// Toolchain: ${CROSS_COMPILE}gcc app.c -o app -I${PREFIX}/include/SDL/ -L${PREFIX}/lib/ -lSDL -lSDL_ttf
-
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <SDL_image.h>
@@ -239,11 +235,12 @@ void handle_input(SDL_Event* event) {
             strcpy(data, "{\n");
             for (int i = 0; i < NUM_BUTTONS; i++) {
                 char button_state[15];
-                sprintf(button_state, "\t%s: %d,\n", button_mapping[i].key, state.state[button_mapping[i].index]);
+                sprintf(button_state, "\t\"%s\": %d,\n", button_mapping[i].key, state.state[button_mapping[i].index]);
                 strcat(data, button_state);
             }
+            data[strlen(data) - 2] = '\0';
             strcat(data, "}\n");
-            send_to_client(data);
+            udp_send_to_client(data);
         }
 
         // App Controls

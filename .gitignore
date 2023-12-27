@@ -57,3 +57,8 @@ dkms.conf
 
 # Build
 build/
+config.ini
+
+# Python
+*.pyc
+__pycache__/

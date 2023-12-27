@@ -1,88 +1,101 @@
 import sys
-import socket
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QTextEdit
-from PyQt5.QtCore import QThread, pyqtSignal
-
-class ListenerThread(QThread):
-    received_signal = pyqtSignal(str)
-    disconnected_signal = pyqtSignal()  # Signal for disconnection
-
-    def __init__(self, ip, port):
-        super().__init__()
-        self.ip = ip
-        self.port = port
-        self.is_running = True
-
-    def run(self):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect((self.ip, self.port))
-                s.sendall(b"WIPADRETRO_CONNECT")
-                s.settimeout(2.0)
-                print(f"Connected to {self.ip}:{self.port}")
-                while self.is_running:
-                    try:
-                        data = s.recv(1024)
-                        if data:
-                            message = data.decode('utf-8')
-                            self.received_signal.emit(message)
-                            # Check for the disconnect message
-                            if message == "WIPADRETRO_DISCONNECT":
-                                print("Disconnect command received.")
-                                self.disconnected_signal.emit()  # Emit disconnection signal
-                                break  # Exit the loop
-                    except socket.timeout:
-                        continue
-        except Exception as e:
-            print(f"Connection closed or error: {e}")
-
-    def stop(self):
-        self.is_running = False
-        self.quit()
-        self.wait()
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QGridLayout, QLabel, QGroupBox
+from listener_thread import ListenerThread
 
 class WiPadRetroLink(QWidget):
     def __init__(self):
         super().__init__()
         self.listener = None
-        self.initUI()
+        self.is_connected = False
+        self.init_ui()
     
-    def initUI(self):
-        layout = QVBoxLayout()
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(30)  # Adjust spacing between group boxes
+
+        # Group box for IP and Connect
+        self.connection_group = QGroupBox("Connection Settings")
+        connection_layout = QVBoxLayout(self.connection_group)
+        connection_layout.setContentsMargins(10, 10, 10, 10)
 
         self.ip_input = QLineEdit(self)
         self.ip_input.setPlaceholderText("Enter IP Address")
-        layout.addWidget(self.ip_input)
+        self.ip_input.setText("127.0.0.1")
+        self.ip_input.setText("192.168.0.102")
+        connection_layout.addWidget(self.ip_input)
 
         self.connect_btn = QPushButton('Connect', self)
         self.connect_btn.clicked.connect(self.connect_to_server)
-        layout.addWidget(self.connect_btn)
+        connection_layout.addWidget(self.connect_btn)
 
-        self.messages = QTextEdit(self)
-        self.messages.setReadOnly(True)
-        layout.addWidget(self.messages)
+        main_layout.addWidget(self.connection_group)
 
-        self.setLayout(layout)
-        self.setGeometry(300, 300, 300, 200)
+        # Group box for Button Configurations
+        self.btn_config_group = QGroupBox("Button Configurations")
+        grid_layout = QGridLayout(self.btn_config_group)
+        grid_layout.setContentsMargins(10, 10, 10, 10)
+
+        keys = ["up", "down", "left", "right", "a", "b", "x", "y", "l1", "r1", "l2", "r2", "select", "start"]
+        self.key_labels = {}
+        self.key_inputs = {}
+
+        for i, key in enumerate(keys):
+            label = QLabel(key.capitalize())
+            self.key_labels[key] = label
+            grid_layout.addWidget(label, i//2, 2*(i%2))
+            line_edit = QLineEdit(self)
+            line_edit.setPlaceholderText("Key")
+            line_edit.setMaximumWidth(80)
+            self.key_inputs[key] = line_edit
+            grid_layout.addWidget(line_edit, i//2, 2*(i%2) + 1)
+
+        main_layout.addWidget(self.btn_config_group)
+
+        self.setGeometry(300, 100, 320, 400)
         self.setWindowTitle('WiPadRetro Link')
+        self.setFixedSize(self.size())
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint)
         self.show()
 
     def connect_to_server(self):
-        ip = self.ip_input.text()
-        port = 1803
-        if self.listener is None or not self.listener.isRunning():
-            self.listener = ListenerThread(ip, port)
-            self.listener.received_signal.connect(self.update_messages)
-            self.listener.disconnected_signal.connect(self.handle_disconnect)
-            self.listener.start()
+        if not self.is_connected:
+            ip = self.ip_input.text()
+            if self.listener is None or not self.listener.isRunning():
+                self.listener = ListenerThread(ip)
+                self.listener.connected_signal.connect(self.handle_connect)
+                self.listener.received_signal.connect(self.update_keyinput)
+                self.listener.disconnected_signal.connect(self.handle_disconnect)
+                self.listener.start()
+        else:
+            self.handle_disconnect()
 
-    def update_messages(self, message):
-        self.messages.append(message)
+
+    def update_keyinput(self, key_input):
+        for key in self.key_labels:
+            self.key_labels[key].setStyleSheet("font-weight: normal")
+            if key_input[key]:
+                self.key_labels[key].setStyleSheet("font-weight: bold")
+
+    def handle_connect(self):
+        self.is_connected = True
+        self.connect_btn.setText("Disconnect")
+
+        self.ip_input.setEnabled(False)
+        for key in self.key_inputs:
+            self.key_inputs[key].setEnabled(False)
 
     def handle_disconnect(self):
-        if self.listener and self.listener.isRunning():
+        self.is_connected = False
+        self.connect_btn.setText("Connect")
+        if self.listener:
             self.listener.stop()
-        self.messages.append("Disconnected from server.")
+
+        self.ip_input.setEnabled(True)
+        for key in self.key_inputs:
+            self.key_inputs[key].setEnabled(True)
+        for key in self.key_labels:
+            self.key_labels[key].setStyleSheet("font-weight: normal")
 
     def closeEvent(self, event):
         if self.listener and self.listener.isRunning():

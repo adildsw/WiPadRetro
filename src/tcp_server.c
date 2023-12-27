@@ -8,8 +8,34 @@
 #include <tcp_server.h>
 
 int global_client_fd = -1;
+int global_udp_socket_fd = -1;
 
 pthread_t thread_id;
+
+struct sockaddr_in udp_server_addr;
+
+// Function to initialize UDP socket
+void init_udp_sender(const char *server_ip) {
+    // Close existing socket if open
+    if (global_udp_socket_fd != -1) {
+        close(global_udp_socket_fd);
+    }
+
+    // Create a socket for UDP
+    global_udp_socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (global_udp_socket_fd < 0) {
+        perror("Cannot create UDP socket");
+        return;
+    }
+
+    // Set up the server address structure for sending
+    memset(&udp_server_addr, 0, sizeof(udp_server_addr));
+    udp_server_addr.sin_family = AF_INET;
+    udp_server_addr.sin_port = htons(PORT);
+    udp_server_addr.sin_addr.s_addr = inet_addr(server_ip);
+
+    printf("UDP Sender Socket created for %s:%d\n", server_ip, PORT);
+}
 
 // TCP server thread function
 static void *tcp_server_thread(void *arg) {
@@ -61,6 +87,7 @@ static void *tcp_server_thread(void *arg) {
         return NULL;
     }
 
+    init_udp_sender(inet_ntoa(client_addr.sin_addr));
     printf("Connection accepted from %s\n", inet_ntoa(client_addr.sin_addr));
 
     // Receive messages from client
@@ -114,6 +141,26 @@ void send_to_client(const char* data) {
     }
 }
 
+void udp_send_to_client(const char* data) {
+    if (global_udp_socket_fd < 0) {
+        fprintf(stderr, "UDP socket is not initialized.\n");
+        return;
+    }
+
+    if (data == NULL) {
+        fprintf(stderr, "Data to send is NULL.\n");
+        return;
+    }
+
+    ssize_t sent_bytes = sendto(global_udp_socket_fd, data, strlen(data), 0, (struct sockaddr *)&udp_server_addr, sizeof(udp_server_addr));
+    if (sent_bytes < 0) {
+        perror("Failed to send UDP data");
+    } else {
+        printf("Successfully sent %zd bytes\n", sent_bytes);
+    }
+}
+
+
 // Function to stop the server
 void stop_tcp_server() {
     if (global_client_fd != -1) {
@@ -132,3 +179,8 @@ void force_disconnect_client() {
         printf("Client forcefully disconnected\n");
     }
 }
+
+
+
+
+
