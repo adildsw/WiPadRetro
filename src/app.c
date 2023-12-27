@@ -261,10 +261,6 @@ void handle_input(SDL_Event* event) {
             cycle_network();
             redraw = SDL_TRUE;
         }
-        if (state.state[BUTTON_L1]) {
-            is_connected = SDL_TRUE;
-            redraw = SDL_TRUE;
-        }
     }
 }
 
