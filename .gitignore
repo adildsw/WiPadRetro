@@ -58,6 +58,7 @@ dkms.conf
 # Build
 build/
 config.ini
+WiPadRetroLink/src/config.json
 
 # Python
 *.pyc

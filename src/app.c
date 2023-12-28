@@ -44,6 +44,7 @@ void render_topbar(const char* text);
 void render_bottombar();
 void render_input_visualization();
 void handle_input(SDL_Event* event);
+void stream_input_to_client();
 void cycle_network();
 void render();
 void tcp_callback(const char* data);
@@ -231,16 +232,7 @@ void handle_input(SDL_Event* event) {
 
         // Send Input To Client
         if (is_connected) {
-            char data[200];
-            strcpy(data, "{\n");
-            for (int i = 0; i < NUM_BUTTONS; i++) {
-                char button_state[15];
-                sprintf(button_state, "\t\"%s\": %d,\n", button_mapping[i].key, state.state[button_mapping[i].index]);
-                strcat(data, button_state);
-            }
-            data[strlen(data) - 2] = '\0';
-            strcat(data, "}\n");
-            udp_send_to_client(data);
+            stream_input_to_client();
         }
 
         // App Controls
@@ -259,6 +251,19 @@ void handle_input(SDL_Event* event) {
             redraw = SDL_TRUE;
         }
     }
+}
+
+void stream_input_to_client() {
+    char data[200];
+    strcpy(data, "{\n");
+    for (int i = 0; i < NUM_BUTTONS - 1; i++) {
+        char button_state[15];
+        sprintf(button_state, "\t\"%s\": %d,\n", button_mapping[i].key, state.state[button_mapping[i].index]);
+        strcat(data, button_state);
+    }
+    data[strlen(data) - 2] = '\0';
+    strcat(data, "}\n");
+    udp_send_to_client(data);
 }
 
 void cycle_network() {
@@ -318,6 +323,9 @@ int main(int argc, char *argv[])
 
         // Rendering
         if (redraw) render();
+        if (is_connected) {
+            stream_input_to_client();
+        }
 
         // Delaying to 60 FPS
         SDL_Delay(1000 / 60);

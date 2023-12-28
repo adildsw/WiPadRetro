@@ -23,6 +23,7 @@ class ListenerThread(QThread):
         self.port = port
         self.is_running = True
         self.threadpool = QThreadPool()
+        self.i = 0
 
     def run(self):
         # Start TCP handling in its own thread
@@ -100,11 +101,11 @@ class ListenerThread(QThread):
 
     def handle_udp_data(self, data):
         message = data.decode('utf-8')
-        print(message)
-        # Handle your UDP data here
         try:
             keyinput = json.loads(message)
             self.received_signal.emit(keyinput)
+            self.i += 1
+            print('a', self.i)
         except Exception as e:
             print(f"Invalid data format for UDP: {e}")
 

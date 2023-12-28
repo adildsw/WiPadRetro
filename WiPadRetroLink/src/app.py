@@ -1,15 +1,52 @@
 import sys
-from PyQt5.QtCore import Qt
+# import pyautogui
+# import keyboard
+from pynput.keyboard import Controller
+from PyQt5.QtCore import Qt, QEvent, QTimer
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QGridLayout, QLabel, QGroupBox
 from listener_thread import ListenerThread
+from config_util import WiPadRetroLinkConfigUtil
 
 class WiPadRetroLink(QWidget):
     def __init__(self):
         super().__init__()
         self.listener = None
         self.is_connected = False
+        # pyautogui.PAUSE = 0
+        # pyautogui.MINIMUM_SLEEP = 0
+        # pyautogui.DARWIN_CATCH_UP_TIME = 0
+        self.keyboard = Controller()
+
+        self.assign_to = None
+
+        self.button_states = {
+            "up": 0,
+            "down": 0,
+            "left": 0,
+            "right": 0,
+            "a": 0,
+            "b": 0,
+            "x": 0,
+            "y": 0,
+            "l1": 0,
+            "r1": 0,
+            "l2": 0,
+            "r2": 0,
+            "select": 0,
+            "start": 0
+        }
+        self.config = WiPadRetroLinkConfigUtil()
+
         self.init_ui()
-    
+        self.setFocusPolicy(Qt.StrongFocus)
+        QApplication.instance().installEventFilter(self)
+
+        self.polling_timer = QTimer(self)
+        self.polling_timer.timeout.connect(self.execute_button_press)
+        self.polling_timer.start(100)  # Poll every 100ms, adjust as needed
+
+
+
     def init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(30)  # Adjust spacing between group boxes
@@ -44,11 +81,13 @@ class WiPadRetroLink(QWidget):
             label = QLabel(key.capitalize())
             self.key_labels[key] = label
             grid_layout.addWidget(label, i//2, 2*(i%2))
-            line_edit = QLineEdit(self)
-            line_edit.setPlaceholderText("Key")
-            line_edit.setMaximumWidth(80)
-            self.key_inputs[key] = line_edit
-            grid_layout.addWidget(line_edit, i//2, 2*(i%2) + 1)
+
+            key_button = QPushButton(self.config.get_config_value(key))
+            key_button.setMaximumWidth(80)
+            key_button.setObjectName(key)
+            key_button.clicked.connect(self.enable_key_capture)
+            self.key_inputs[key] = key_button
+            grid_layout.addWidget(key_button, i//2, 2*(i%2) + 1)
 
         main_layout.addWidget(self.btn_config_group)
 
@@ -58,24 +97,101 @@ class WiPadRetroLink(QWidget):
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint)
         self.show()
 
+    def enable_key_capture(self, keyname):
+        self.assign_to = self.sender()
+        self.assign_to.setText("<Press>")
+        self.assign_to.setFocus()
+
+    def set_key_config(self, key):
+        if self.assign_to:
+            for k in self.key_inputs:
+                if self.key_inputs[k].text() == key:
+                    self.key_inputs[k].setText("")
+                    self.config.update_config(k, "")
+            self.assign_to.setText(key)
+            self.config.update_config(self.assign_to.objectName(), key)
+            self.assign_to = None
+
+
+
+    
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.KeyPress and self.assign_to:
+            arrowkey = ''
+            if event.key() in (Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down):
+                if event.key() == Qt.Key_Up:
+                    arrowkey = 'up'
+                elif event.key() == Qt.Key_Down:
+                    arrowkey = 'down'
+                elif event.key() == Qt.Key_Left:
+                    arrowkey = 'left'
+                elif event.key() == Qt.Key_Right:
+                    arrowkey = 'right'
+            else:
+                modifiers = event.modifiers()
+                mod_str = ''
+                if modifiers & Qt.ShiftModifier:
+                    mod_str = 'shift'
+                if modifiers & Qt.ControlModifier:
+                    mod_str = 'ctrl'
+                if modifiers & Qt.AltModifier:
+                    mod_str = 'alt'
+                if modifiers & Qt.MetaModifier:
+                    mod_str = 'meta'
+
+            if arrowkey:
+                self.set_key_config(arrowkey)
+            elif mod_str:
+                self.set_key_config(mod_str)
+            else:
+                self.set_key_config(event.text())
+                
+            return True
+        
+        return super().eventFilter(source, event)
+    
+
+
     def connect_to_server(self):
         if not self.is_connected:
             ip = self.ip_input.text()
             if self.listener is None or not self.listener.isRunning():
                 self.listener = ListenerThread(ip)
                 self.listener.connected_signal.connect(self.handle_connect)
-                self.listener.received_signal.connect(self.update_keyinput)
+                self.listener.received_signal.connect(self.update_button_states)
                 self.listener.disconnected_signal.connect(self.handle_disconnect)
                 self.listener.start()
         else:
             self.handle_disconnect()
 
 
-    def update_keyinput(self, key_input):
+    def update_button_states(self, button_states):
         for key in self.key_labels:
-            self.key_labels[key].setStyleSheet("font-weight: normal")
-            if key_input[key]:
+            if button_states[key]:
                 self.key_labels[key].setStyleSheet("font-weight: bold")
+                if self.config.get_config_value(key):
+                    # pass
+                    # pyautogui.press(self.config.get_config_value(key))
+                    # keyboard.press(self.config.get_config_value(key))
+                    self.keyboard.press(self.config.get_config_value(key))
+            else:
+                self.key_labels[key].setStyleSheet("font-weight: normal")
+                if self.config.get_config_value(key) and self.button_states[key]:
+                    # pass
+                    # pyautogui.keyUp(self.config.get_config_value(key))
+                    # keyboard.release(self.config.get_config_value(key))
+                    self.keyboard.release(self.config.get_config_value(key))
+        
+        self.button_states = button_states
+
+    def execute_button_press(self):
+        pass
+        # if self.is_connected:
+        #     for key in self.button_states:
+        #         if self.button_states[key]:
+        #             self.keyboard.press(self.config.get_config_value(key))
+        #         else:
+        #             self.keyboard.release(self.config.get_config_value(key))
 
     def handle_connect(self):
         self.is_connected = True
