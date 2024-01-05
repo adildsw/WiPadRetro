@@ -1,6 +1,4 @@
 import sys
-# import pyautogui
-# import keyboard
 from pynput.keyboard import Controller
 from PyQt5.QtCore import Qt, QEvent, QTimer
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QGridLayout, QLabel, QGroupBox
@@ -12,9 +10,6 @@ class WiPadRetroLink(QWidget):
         super().__init__()
         self.listener = None
         self.is_connected = False
-        # pyautogui.PAUSE = 0
-        # pyautogui.MINIMUM_SLEEP = 0
-        # pyautogui.DARWIN_CATCH_UP_TIME = 0
         self.keyboard = Controller()
 
         self.assign_to = None
@@ -29,21 +24,17 @@ class WiPadRetroLink(QWidget):
             "x": 0,
             "y": 0,
             "l1": 0,
-            "r1": 0,
             "l2": 0,
+            "r1": 0,
             "r2": 0,
+            "start": 0,
             "select": 0,
-            "start": 0
         }
         self.config = WiPadRetroLinkConfigUtil()
 
         self.init_ui()
         self.setFocusPolicy(Qt.StrongFocus)
         QApplication.instance().installEventFilter(self)
-
-        self.polling_timer = QTimer(self)
-        self.polling_timer.timeout.connect(self.execute_button_press)
-        self.polling_timer.start(100)  # Poll every 100ms, adjust as needed
 
 
 
@@ -165,33 +156,32 @@ class WiPadRetroLink(QWidget):
             self.handle_disconnect()
 
 
-    def update_button_states(self, button_states):
+    def unpack_button_states(self, data):
+        button_states = self.button_states.copy()
+        buttons = button_states.keys()
+        
+        for i, button in enumerate(buttons):
+            if data & (1 << i):
+                button_states[button] = 1
+            else:
+                button_states[button] = 0
+
+        return button_states
+
+    def update_button_states(self, data):
+        button_states = self.unpack_button_states(data)
+        
         for key in self.key_labels:
             if button_states[key]:
                 self.key_labels[key].setStyleSheet("font-weight: bold")
                 if self.config.get_config_value(key):
-                    # pass
-                    # pyautogui.press(self.config.get_config_value(key))
-                    # keyboard.press(self.config.get_config_value(key))
                     self.keyboard.press(self.config.get_config_value(key))
             else:
                 self.key_labels[key].setStyleSheet("font-weight: normal")
                 if self.config.get_config_value(key) and self.button_states[key]:
-                    # pass
-                    # pyautogui.keyUp(self.config.get_config_value(key))
-                    # keyboard.release(self.config.get_config_value(key))
                     self.keyboard.release(self.config.get_config_value(key))
-        
-        self.button_states = button_states
 
-    def execute_button_press(self):
-        pass
-        # if self.is_connected:
-        #     for key in self.button_states:
-        #         if self.button_states[key]:
-        #             self.keyboard.press(self.config.get_config_value(key))
-        #         else:
-        #             self.keyboard.release(self.config.get_config_value(key))
+        self.button_states = button_states
 
     def handle_connect(self):
         self.is_connected = True

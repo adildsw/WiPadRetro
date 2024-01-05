@@ -254,16 +254,24 @@ void handle_input(SDL_Event* event) {
 }
 
 void stream_input_to_client() {
-    char data[200];
-    strcpy(data, "{\n");
-    for (int i = 0; i < NUM_BUTTONS - 1; i++) {
-        char button_state[15];
-        sprintf(button_state, "\t\"%s\": %d,\n", button_mapping[i].key, state.state[button_mapping[i].index]);
-        strcat(data, button_state);
+    // char data[200];
+    // strcpy(data, "{\n");
+    // for (int i = 0; i < NUM_BUTTONS - 1; i++) {
+    //     char button_state[15];
+    //     sprintf(button_state, "\t\"%s\": %d,\n", button_mapping[i].key, state.state[button_mapping[i].index]);
+    //     strcat(data, button_state);
+    // }
+    // data[strlen(data) - 2] = '\0';
+    // strcat(data, "}\n");
+    // udp_send_to_client(data);
+
+    unsigned short packed = 0;
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        if (state.state[button_mapping[i].index]) {
+            packed |= (1 << i);
+        }
     }
-    data[strlen(data) - 2] = '\0';
-    strcat(data, "}\n");
-    udp_send_to_client(data);
+    udp_send_to_client(packed);
 }
 
 void cycle_network() {

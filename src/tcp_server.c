@@ -141,18 +141,36 @@ void send_to_client(const char* data) {
     }
 }
 
-void udp_send_to_client(const char* data) {
+// void udp_send_to_client(const char* data) {
+//     if (global_udp_socket_fd < 0) {
+//         fprintf(stderr, "UDP socket is not initialized.\n");
+//         return;
+//     }
+
+//     if (data == NULL) {
+//         fprintf(stderr, "Data to send is NULL.\n");
+//         return;
+//     }
+
+//     ssize_t sent_bytes = sendto(global_udp_socket_fd, data, strlen(data), 0, (struct sockaddr *)&udp_server_addr, sizeof(udp_server_addr));
+//     if (sent_bytes < 0) {
+//         perror("Failed to send UDP data");
+//     } else {
+//         printf("Successfully sent %zd bytes\n", sent_bytes);
+//     }
+// }
+
+void udp_send_to_client(unsigned short data) {
     if (global_udp_socket_fd < 0) {
         fprintf(stderr, "UDP socket is not initialized.\n");
         return;
     }
 
-    if (data == NULL) {
-        fprintf(stderr, "Data to send is NULL.\n");
-        return;
-    }
+    unsigned short net_data = htons(data); // Convert to network byte order
 
-    ssize_t sent_bytes = sendto(global_udp_socket_fd, data, strlen(data), 0, (struct sockaddr *)&udp_server_addr, sizeof(udp_server_addr));
+    ssize_t sent_bytes = sendto(global_udp_socket_fd, &net_data, sizeof(net_data), 0, 
+                                (struct sockaddr *)&udp_server_addr, 
+                                sizeof(udp_server_addr));
     if (sent_bytes < 0) {
         perror("Failed to send UDP data");
     } else {

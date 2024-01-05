@@ -1,5 +1,6 @@
 import socket
 import json
+import struct
 from PyQt5.QtCore import QThread, pyqtSignal, QRunnable, QThreadPool
 
 class Worker(QRunnable):
@@ -14,7 +15,7 @@ class Worker(QRunnable):
 
 class ListenerThread(QThread):
     connected_signal = pyqtSignal()
-    received_signal = pyqtSignal(dict)
+    received_signal = pyqtSignal(int)
     disconnected_signal = pyqtSignal()
 
     def __init__(self, ip, port=1803):
@@ -23,7 +24,6 @@ class ListenerThread(QThread):
         self.port = port
         self.is_running = True
         self.threadpool = QThreadPool()
-        self.i = 0
 
     def run(self):
         # Start TCP handling in its own thread
@@ -63,7 +63,7 @@ class ListenerThread(QThread):
 
             while self.is_running:
                 try:
-                    data_udp, addr = self.s_udp.recvfrom(1024)
+                    data_udp, addr = self.s_udp.recvfrom(2)
                     if data_udp:
                         self.handle_udp_data(data_udp)
                 except socket.timeout:
@@ -100,12 +100,9 @@ class ListenerThread(QThread):
             self.disconnected_signal.emit()
 
     def handle_udp_data(self, data):
-        message = data.decode('utf-8')
+        message = struct.unpack('!H', data)[0]
         try:
-            keyinput = json.loads(message)
-            self.received_signal.emit(keyinput)
-            self.i += 1
-            print('a', self.i)
+            self.received_signal.emit(message)
         except Exception as e:
             print(f"Invalid data format for UDP: {e}")
 
