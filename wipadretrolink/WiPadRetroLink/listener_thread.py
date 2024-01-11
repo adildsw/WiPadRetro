@@ -13,7 +13,7 @@ class Worker(QRunnable):
     def run(self):
         self.function(*self.args, **self.kwargs)
 
-class ListenerThread(QThread):
+class WiPadRetroLinkListenerThread(QThread):
     connected_signal = pyqtSignal()
     received_signal = pyqtSignal(int)
     disconnected_signal = pyqtSignal()

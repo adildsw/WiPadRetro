@@ -1,9 +1,10 @@
 import sys
 from pynput.keyboard import Controller
-from PyQt5.QtCore import Qt, QEvent, QTimer
+from PyQt5.QtCore import Qt, QEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QGridLayout, QLabel, QGroupBox
-from listener_thread import ListenerThread
-from config_util import WiPadRetroLinkConfigUtil
+
+from .listener_thread import WiPadRetroLinkListenerThread
+from .config_util import WiPadRetroLinkConfigUtil
 
 class WiPadRetroLink(QWidget):
     def __init__(self):
@@ -147,7 +148,7 @@ class WiPadRetroLink(QWidget):
         if not self.is_connected:
             ip = self.ip_input.text()
             if self.listener is None or not self.listener.isRunning():
-                self.listener = ListenerThread(ip)
+                self.listener = WiPadRetroLinkListenerThread(ip)
                 self.listener.connected_signal.connect(self.handle_connect)
                 self.listener.received_signal.connect(self.update_button_states)
                 self.listener.disconnected_signal.connect(self.handle_disconnect)
@@ -208,7 +209,10 @@ class WiPadRetroLink(QWidget):
             self.listener.stop()
         event.accept()
 
-if __name__ == '__main__':
+def main():
     app = QApplication(sys.argv)
     ex = WiPadRetroLink()
     sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    main()

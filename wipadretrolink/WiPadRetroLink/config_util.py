@@ -1,9 +1,10 @@
-import json
 import os
+import json
 
 class WiPadRetroLinkConfigUtil:
     def __init__(self):
-        self.config_path = "config.json"
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.config_path = os.path.join(current_dir, "config.json")
         self.default_config = {
             "up": "w",
             "down": "s",

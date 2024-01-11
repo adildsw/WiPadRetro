@@ -56,9 +56,10 @@ dkms.conf
 .DS_Store
 
 # Build
-build/
-config.ini
-WiPadRetroLink/src/config.json
+wipadretro/build/
+wipadretro/config.ini
+wipadretrolink/build/
+wipadretrolink/WiPadRetroLink.egg-info/
 
 # Python
 *.pyc
