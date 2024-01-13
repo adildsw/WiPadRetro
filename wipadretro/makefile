@@ -1,7 +1,11 @@
-# Compiler settings
+# Cross-compiler and SDL paths (Modify these to match your system)
 CC = ${CROSS_COMPILE}gcc
-CFLAGS = -I./include/ -I${PREFIX}/include/SDL/
-LIBS = -L${PREFIX}/lib/ -lSDL -lSDL_image -lSDL_ttf -lpthread
+SDL_CFLAGS = -I${PREFIX}/include/SDL/
+SDL_LIBS = -L${PREFIX}/lib/ -lSDL -lSDL_image -lSDL_ttf
+
+# Include flags and library flags
+CFLAGS = -I./include/ $(SDL_CFLAGS)
+LIBS = $(SDL_LIBS) -lpthread
 
 # Source and object files
 SRC = $(wildcard src/*.c)
