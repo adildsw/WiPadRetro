@@ -8,9 +8,11 @@ WiPadRetro transforms your WiFi-enabled handheld device into a PC gamepad. It al
 
 ![WiPadRetro Demonstration (Contra)](./images/gameplay.gif)
 
-## Building
+## Using WiPadRetro
 
-WiPadRetro is split into two main components: WiPadRetro (the sender) running on the handheld device, and WiPadRetroLink (the receiver) running on the PC. If you don't want to build the project yourself, you can download the latest release [here](https://github.com/adildsw/WiPadRetro/releases).
+WiPadRetro is split into two main components: WiPadRetro (the sender) running on the handheld device, and WiPadRetroLink (the receiver) running on the PC. If you don't want to build the project yourself, you can download the latest release [here](https://github.com/adildsw/WiPadRetro/releases). 
+
+There is a great step-by-step [video tutorial](https://www.youtube.com/watch?v=f6jmf9e7bEA) (and a [blog](https://duckyobrien.com/2024/04/02/how-to-use-your-miyoo-mini-plus-as-a-controller/) too!) by Ducky Obrien for using WiPadRetro.
 
 ### Building WiPadRetro
 Cross-compiling WiPadRetro for the appropriate handheld architecture will require its corresponding toolchain/development environment (e.g., [Miyoo Mini Toolchain](https://github.com/MiyooMini/union-toolchain)). Additionally, you will also need to have the SDL1.2 library compiled for the corresponding handheld architecture.
